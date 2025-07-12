@@ -144,7 +144,22 @@ export async function GET(request, { params }) {
     const url = new URL(request.url)
     const path = url.pathname.split('/api/')[1] || ''
 
+    // Authentication endpoints
+    if (path === 'auth/me') {
+      const user = await authenticate(request)
+      if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+      return NextResponse.json({ user })
+    }
+
     if (path === 'tables' || path === '') {
+      // Check authentication for data access
+      const user = await authenticate(request)
+      if (!user) {
+        return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+      }
+
       // Get tables data
       let tablesData = await db.collection('tables').findOne({ type: 'main' })
       
@@ -159,12 +174,18 @@ export async function GET(request, { params }) {
 
       return NextResponse.json({
         tables: tablesData.tables || [],
-        metadata: tablesData.metadata || {}
+        metadata: tablesData.metadata || {},
+        userRole: user.role
       })
     }
 
     // Analytics endpoint
     if (path === 'analytics') {
+      const user = await authenticate(request)
+      if (!user) {
+        return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+      }
+
       const tablesData = await db.collection('tables').findOne({ type: 'main' })
       
       if (!tablesData) {
