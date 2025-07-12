@@ -232,7 +232,45 @@ export async function POST(request, { params }) {
     const url = new URL(request.url)
     const path = url.pathname.split('/api/')[1] || ''
 
+    // Authentication login endpoint
+    if (path === 'auth/login') {
+      const body = await request.json()
+      const { username, password } = body
+
+      // Find user in default users (in production, this would be from database)
+      const user = defaultUsers.find(u => u.username === username && u.password === password)
+      
+      if (!user) {
+        return NextResponse.json({ error: 'نامی بەکارهێنەر یان ووشەی نهێنی هەڵەیە' }, { status: 401 })
+      }
+
+      // Create session token
+      const token = uuidv4()
+      const session = {
+        token,
+        user: { username: user.username, name: user.name, role: user.role },
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+      }
+
+      // Store session in database
+      await db.collection('sessions').insertOne(session)
+
+      return NextResponse.json({
+        token,
+        role: user.role,
+        name: user.name,
+        username: user.username
+      })
+    }
+
     if (path === 'tables') {
+      // Check authentication for creating tables
+      const user = await authenticate(request)
+      if (!user || user.role !== 'admin') {
+        return NextResponse.json({ error: 'تەنها بەڕێوەبەران دەتوانن خشتەی نوێ دروست بکەن' }, { status: 403 })
+      }
+
       const body = await request.json()
       
       // Create new table
@@ -250,6 +288,11 @@ export async function POST(request, { params }) {
 
     // Handle drag and drop moves
     if (path === 'tables/move') {
+      const user = await authenticate(request)
+      if (!user || user.role !== 'admin') {
+        return NextResponse.json({ error: 'تەنها بەڕێوەبەران دەتوانن تۆمارەکان بگوازنەوە' }, { status: 403 })
+      }
+
       const body = await request.json()
       const { sourceTable, targetTable, rowData } = body
       
@@ -289,6 +332,11 @@ export async function POST(request, { params }) {
 
     // Batch operations
     if (path === 'tables/batch') {
+      const user = await authenticate(request)
+      if (!user || user.role !== 'admin') {
+        return NextResponse.json({ error: 'تەنها بەڕێوەبەران دەتوانن کردارە کۆمەڵایەتیەکان ئەنجام بدەن' }, { status: 403 })
+      }
+
       const body = await request.json()
       const { operation, tableName, rowIndices } = body
       
