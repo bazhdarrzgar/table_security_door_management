@@ -5,8 +5,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Trash2, Edit, Plus, Search, Download, Printer, GripVertical, Users, Shield } from 'lucide-react'
+import { Trash2, Edit, Plus, Search, Download, Printer, GripVertical, Users, Shield, Lock } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import AuthForm from '@/components/AuthForm'
+import UserInfo from '@/components/UserInfo'
 import { 
   DndContext, 
   DragOverlay, 
@@ -24,7 +27,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 
 // Draggable Row Component
-function DraggableRow({ id, children, isOverlay = false }) {
+function DraggableRow({ id, children, isOverlay = false, disabled = false }) {
   const {
     attributes,
     listeners,
@@ -32,7 +35,7 @@ function DraggableRow({ id, children, isOverlay = false }) {
     transform,
     transition,
     isDragging,
-  } = useSortable({ id })
+  } = useSortable({ id, disabled })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -44,12 +47,12 @@ function DraggableRow({ id, children, isOverlay = false }) {
     <tr
       ref={setNodeRef}
       style={style}
-      className={`${isDragging ? 'z-50 shadow-2xl' : ''} ${isOverlay ? 'bg-blue-50 border-2 border-blue-300' : ''} hover:bg-gray-50 print:hover:bg-inherit cursor-grab active:cursor-grabbing`}
+      className={`${isDragging ? 'z-50 shadow-2xl' : ''} ${isOverlay ? 'bg-blue-50 border-2 border-blue-300' : ''} hover:bg-gray-50 print:hover:bg-inherit ${disabled ? 'cursor-not-allowed' : 'cursor-grab active:cursor-grabbing'}`}
       {...attributes}
     >
       <td className="px-2 py-2 print:hidden">
         <div {...listeners} className="flex items-center justify-center">
-          <GripVertical className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+          <GripVertical className={`w-4 h-4 ${disabled ? 'text-gray-300' : 'text-gray-400 hover:text-gray-600'}`} />
         </div>
       </td>
       {children}
@@ -58,9 +61,12 @@ function DraggableRow({ id, children, isOverlay = false }) {
 }
 
 // Droppable Table Component
-function DroppableTable({ table, onAddRow, onDeleteRow, onUpdateRow, editingRow, setEditingRow }) {
+function DroppableTable({ table, onAddRow, onDeleteRow, onUpdateRow, editingRow, setEditingRow, userRole }) {
   const [newRowData, setNewRowData] = useState({ name: '', rank: '' })
   const [selectedTable, setSelectedTable] = useState(null)
+
+  const canEdit = userRole === 'admin'
+  const canDrag = userRole === 'admin'
 
   return (
     <Card className="shadow-lg print:shadow-none print:border-2 bg-white">
@@ -73,72 +79,80 @@ function DroppableTable({ table, onAddRow, onDeleteRow, onUpdateRow, editingRow,
             <Badge variant="secondary" className="text-xs bg-red-400 text-white">
               {table.data.length} تۆمار
             </Badge>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-white hover:bg-red-400"
-                  onClick={() => setSelectedTable(table.name)}
-                >
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle className="text-right">
-                    زیادکردنی تۆمارێکی نوێ - {table.name}
-                  </DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-right mb-1">
-                      ناو
-                    </label>
-                    <Input
-                      value={newRowData.name}
-                      onChange={(e) => setNewRowData({...newRowData, name: e.target.value})}
-                      className="text-right"
-                      placeholder="ناو..."
-                    />
+            {canEdit && (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-white hover:bg-red-400"
+                    onClick={() => setSelectedTable(table.name)}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle className="text-right">
+                      زیادکردنی تۆمارێکی نوێ - {table.name}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-right mb-1">
+                        ناو
+                      </label>
+                      <Input
+                        value={newRowData.name}
+                        onChange={(e) => setNewRowData({...newRowData, name: e.target.value})}
+                        className="text-right"
+                        placeholder="ناو..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-right mb-1">
+                        ڕەتبە
+                      </label>
+                      <Input
+                        value={newRowData.rank}
+                        onChange={(e) => setNewRowData({...newRowData, rank: e.target.value})}
+                        className="text-right"
+                        placeholder="ڕەتبە..."
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => {
+                          onAddRow(table.name, newRowData)
+                          setNewRowData({ name: '', rank: '' })
+                          setSelectedTable(null)
+                        }}
+                        className="flex-1"
+                        disabled={!newRowData.name || !newRowData.rank}
+                      >
+                        زیادکردن
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedTable(null)
+                          setNewRowData({ name: '', rank: '' })
+                        }}
+                        className="flex-1"
+                      >
+                        پاشگەزبوونەوە
+                      </Button>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-right mb-1">
-                      ڕەتبە
-                    </label>
-                    <Input
-                      value={newRowData.rank}
-                      onChange={(e) => setNewRowData({...newRowData, rank: e.target.value})}
-                      className="text-right"
-                      placeholder="ڕەتبە..."
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => {
-                        onAddRow(table.name, newRowData)
-                        setNewRowData({ name: '', rank: '' })
-                        setSelectedTable(null)
-                      }}
-                      className="flex-1"
-                      disabled={!newRowData.name || !newRowData.rank}
-                    >
-                      زیادکردن
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setSelectedTable(null)
-                        setNewRowData({ name: '', rank: '' })
-                      }}
-                      className="flex-1"
-                    >
-                      پاشگەزبوونەوە
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
+                </DialogContent>
+              </Dialog>
+            )}
+            {!canEdit && (
+              <Badge variant="outline" className="text-xs text-white border-white">
+                <Lock className="w-3 h-3 mr-1" />
+                تەنها خوێندنەوە
+              </Badge>
+            )}
           </div>
         </div>
       </CardHeader>
@@ -155,16 +169,22 @@ function DroppableTable({ table, onAddRow, onDeleteRow, onUpdateRow, editingRow,
                     {column}
                   </th>
                 ))}
-                <th className="px-4 py-2 text-center font-semibold print:hidden">
-                  کردارەکان
-                </th>
+                {canEdit && (
+                  <th className="px-4 py-2 text-center font-semibold print:hidden">
+                    کردارەکان
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
               <SortableContext items={table.data.map((_, index) => `${table.name}-${index}`)} strategy={verticalListSortingStrategy}>
                 {table.data.map((row, rowIndex) => (
-                  <DraggableRow key={`${table.name}-${rowIndex}`} id={`${table.name}-${rowIndex}`}>
-                    {editingRow === `${table.name}-${rowIndex}` ? (
+                  <DraggableRow 
+                    key={`${table.name}-${rowIndex}`} 
+                    id={`${table.name}-${rowIndex}`}
+                    disabled={!canDrag}
+                  >
+                    {editingRow === `${table.name}-${rowIndex}` && canEdit ? (
                       <>
                         <td className="px-4 py-2 border-r border-gray-200 print:px-2 print:py-1">
                           <Input
@@ -209,26 +229,28 @@ function DroppableTable({ table, onAddRow, onDeleteRow, onUpdateRow, editingRow,
                         </td>
                       </>
                     )}
-                    <td className={`px-4 py-2 text-center print:hidden ${rowIndex % 2 === 0 ? 'bg-gray-100' : 'bg-white'}`}>
-                      <div className="flex justify-center gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setEditingRow(`${table.name}-${rowIndex}`)}
-                          className="text-blue-600 hover:bg-blue-50"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => onDeleteRow(table.name, rowIndex)}
-                          className="text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </td>
+                    {canEdit && (
+                      <td className={`px-4 py-2 text-center print:hidden ${rowIndex % 2 === 0 ? 'bg-gray-100' : 'bg-white'}`}>
+                        <div className="flex justify-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setEditingRow(`${table.name}-${rowIndex}`)}
+                            className="text-blue-600 hover:bg-blue-50"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onDeleteRow(table.name, rowIndex)}
+                            className="text-red-600 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    )}
                   </DraggableRow>
                 ))}
               </SortableContext>
@@ -248,6 +270,8 @@ export default function TableManager() {
   const [editingRow, setEditingRow] = useState(null)
   const [activeId, setActiveId] = useState(null)
   const [draggedRow, setDraggedRow] = useState(null)
+  const [user, setUser] = useState(null)
+  const [authLoading, setAuthLoading] = useState(true)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -259,12 +283,46 @@ export default function TableManager() {
   )
 
   useEffect(() => {
-    fetchTables()
+    checkAuth()
   }, [])
+
+  useEffect(() => {
+    if (user) {
+      fetchTables()
+    }
+  }, [user])
+
+  const checkAuth = () => {
+    const token = localStorage.getItem('authToken')
+    const role = localStorage.getItem('userRole')
+    const name = localStorage.getItem('userName')
+    
+    if (token && role && name) {
+      setUser({ token, role, name })
+    }
+    setAuthLoading(false)
+  }
+
+  const handleLogin = (userData) => {
+    setUser(userData)
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('authToken')
+    localStorage.removeItem('userRole')
+    localStorage.removeItem('userName')
+    setUser(null)
+    setTables([])
+    setMetadata({})
+  }
 
   const fetchTables = async () => {
     try {
-      const response = await fetch('/api/tables')
+      const response = await fetch('/api/tables', {
+        headers: {
+          'Authorization': `Bearer ${user?.token || localStorage.getItem('authToken')}`
+        }
+      })
       const data = await response.json()
       setTables(data.tables || [])
       setMetadata(data.metadata || {})
@@ -276,10 +334,18 @@ export default function TableManager() {
   }
 
   const updateTable = async (tableName, newData) => {
+    if (user?.role !== 'admin') {
+      alert('تەنها بەڕێوەبەران دەتوانن گۆڕانکاری بکەن')
+      return
+    }
+
     try {
       const response = await fetch('/api/tables', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.token}`
+        },
         body: JSON.stringify({ tableName, data: newData })
       })
       if (response.ok) {
@@ -287,25 +353,6 @@ export default function TableManager() {
       }
     } catch (error) {
       console.error('Error updating table:', error)
-    }
-  }
-
-  const moveRowBetweenTables = async (sourceTable, targetTable, rowData) => {
-    try {
-      const response = await fetch('/api/tables/move', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          sourceTable, 
-          targetTable, 
-          rowData 
-        })
-      })
-      if (response.ok) {
-        fetchTables()
-      }
-    } catch (error) {
-      console.error('Error moving row:', error)
     }
   }
 
@@ -333,9 +380,10 @@ export default function TableManager() {
   }
 
   const handleDragStart = (event) => {
+    if (user?.role !== 'admin') return
+    
     setActiveId(event.active.id)
     
-    // Parse the dragged item ID to get table and row info
     const [tableName, rowIndex] = event.active.id.split('-')
     const rowIndexNum = parseInt(rowIndex)
     const table = tables.find(t => t.name.includes(tableName.split('_').join(' ')))
@@ -350,6 +398,8 @@ export default function TableManager() {
   }
 
   const handleDragEnd = async (event) => {
+    if (user?.role !== 'admin') return
+    
     const { active, over } = event
     setActiveId(null)
     setDraggedRow(null)
@@ -358,11 +408,9 @@ export default function TableManager() {
       return
     }
 
-    // Parse source and target information
     const [sourceTablePart, sourceIndex] = active.id.split('-')
     const [targetTablePart, targetIndex] = over.id.split('-')
     
-    // Find actual table names
     const sourceTable = tables.find(t => t.name.includes(sourceTablePart.split('_').join(' ')))
     const targetTable = tables.find(t => t.name.includes(targetTablePart.split('_').join(' ')))
     
@@ -371,24 +419,18 @@ export default function TableManager() {
     const sourceRowIndex = parseInt(sourceIndex)
     const targetRowIndex = parseInt(targetIndex)
     
-    // If moving within the same table, handle reordering
     if (sourceTable.name === targetTable.name) {
       const updatedData = [...sourceTable.data]
       const [draggedItem] = updatedData.splice(sourceRowIndex, 1)
       updatedData.splice(targetRowIndex, 0, draggedItem)
       await updateTable(sourceTable.name, updatedData)
     } else {
-      // Moving between different tables
       const rowData = sourceTable.data[sourceRowIndex]
       
-      // Remove from source table
       const sourceUpdatedData = sourceTable.data.filter((_, index) => index !== sourceRowIndex)
-      
-      // Add to target table
       const targetUpdatedData = [...targetTable.data]
       targetUpdatedData.splice(targetRowIndex, 0, rowData)
       
-      // Update both tables
       await updateTable(sourceTable.name, sourceUpdatedData)
       await updateTable(targetTable.name, targetUpdatedData)
     }
@@ -420,13 +462,27 @@ export default function TableManager() {
     link.click()
   }
 
-  if (loading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-xl font-semibold text-gray-600">Loading...</div>
+        <div className="text-xl font-semibold text-gray-600">چاوەڕوان بە...</div>
       </div>
     )
   }
+
+  if (!user) {
+    return <AuthForm onLogin={handleLogin} />
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-xl font-semibold text-gray-600">بارکردنی داتاکان...</div>
+      </div>
+    )
+  }
+
+  const isAdmin = user.role === 'admin'
 
   return (
     <DndContext
@@ -439,9 +495,27 @@ export default function TableManager() {
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="text-center mb-8 print:mb-4">
-            <h1 className="text-3xl font-bold text-red-600 mb-4 print:text-2xl">
+            <div className="flex justify-between items-center mb-4 print:hidden">
+              <UserInfo user={user} onLogout={handleLogout} />
+              <h1 className="text-3xl font-bold text-red-600">
+                وەجهەی مەلازم/ پۆشندار
+              </h1>
+              <div></div>
+            </div>
+            
+            <h1 className="text-3xl font-bold text-red-600 mb-4 print:text-2xl hidden print:block">
               وەجهەی مەلازم/ پۆشندار
             </h1>
+            
+            {/* Permission Alert for Regular Users */}
+            {!isAdmin && (
+              <Alert className="mb-4 border-blue-200 bg-blue-50">
+                <Lock className="w-4 h-4" />
+                <AlertDescription className="text-blue-800 text-right">
+                  تۆ وەک بەکارهێنەری ئاسایی تەنها دەتوانی داتاکان ببینیت. بۆ دەستکاریکردن پێویستت بە مۆڵەتی بەڕێوەبەر هەیە.
+                </AlertDescription>
+              </Alert>
+            )}
             
             {/* Enhanced Controls */}
             <div className="flex flex-wrap justify-center gap-4 mb-6 print:hidden">
@@ -468,12 +542,14 @@ export default function TableManager() {
               </Badge>
             </div>
 
-            {/* Drag and Drop Instructions */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6 print:hidden">
-              <p className="text-sm text-blue-800 text-center">
-                💡 بۆ گواستنەوەی تۆمارەکان، گرتن و کێشانی نیشانەی ☰ بکە
-              </p>
-            </div>
+            {/* Drag and Drop Instructions for Admins */}
+            {isAdmin && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-6 print:hidden">
+                <p className="text-sm text-green-800 text-center">
+                  💡 بۆ گواستنەوەی تۆمارەکان، گرتن و کێشانی نیشانەی ☰ بکە
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Tables Grid */}
@@ -487,6 +563,7 @@ export default function TableManager() {
                 onUpdateRow={updateRow}
                 editingRow={editingRow}
                 setEditingRow={setEditingRow}
+                userRole={user.role}
               />
             ))}
           </div>
@@ -509,7 +586,7 @@ export default function TableManager() {
 
         {/* Drag Overlay */}
         <DragOverlay>
-          {activeId && draggedRow ? (
+          {activeId && draggedRow && isAdmin ? (
             <div className="bg-white shadow-2xl border-2 border-blue-400 rounded-lg p-3 opacity-95">
               <div className="flex items-center gap-3">
                 <GripVertical className="w-4 h-4 text-blue-500" />
@@ -533,6 +610,9 @@ export default function TableManager() {
             }
             .print\\:hidden {
               display: none !important;
+            }
+            .print\\:block {
+              display: block !important;
             }
             .print\\:bg-white {
               background-color: white !important;
