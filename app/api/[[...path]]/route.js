@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { MongoClient } from 'mongodb'
+import { v4 as uuidv4 } from 'uuid'
 
 const MONGO_URL = process.env.MONGO_URL || 'mongodb://localhost:27017'
 const DB_NAME = 'table_manager'
@@ -14,6 +15,40 @@ async function connectDB() {
     db = client.db(DB_NAME)
   }
   return db
+}
+
+// Default users
+const defaultUsers = [
+  {
+    username: 'admin',
+    password: 'admin123',
+    name: 'بەڕێوەبەر',
+    role: 'admin'
+  },
+  {
+    username: 'user',
+    password: 'user123',
+    name: 'بەکارهێنەر',
+    role: 'user'
+  }
+]
+
+// Simple authentication middleware
+async function authenticate(request) {
+  const authHeader = request.headers.get('authorization')
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null
+  }
+  
+  const token = authHeader.substring(7)
+  const db = await connectDB()
+  const session = await db.collection('sessions').findOne({ token })
+  
+  if (session && new Date() < session.expiresAt) {
+    return session.user
+  }
+  
+  return null
 }
 
 // Initialize default data
