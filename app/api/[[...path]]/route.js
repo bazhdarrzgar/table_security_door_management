@@ -128,6 +128,41 @@ export async function GET(request, { params }) {
       })
     }
 
+    // Analytics endpoint
+    if (path === 'analytics') {
+      const tablesData = await db.collection('tables').findOne({ type: 'main' })
+      
+      if (!tablesData) {
+        return NextResponse.json({
+          totalRecords: 0,
+          tableCount: 0,
+          rankDistribution: {}
+        })
+      }
+
+      const totalRecords = tablesData.tables.reduce((sum, table) => sum + table.data.length, 0)
+      const tableCount = tablesData.tables.length
+      
+      // Calculate rank distribution
+      const rankDistribution = {}
+      tablesData.tables.forEach(table => {
+        table.data.forEach(row => {
+          const rank = row[1]
+          rankDistribution[rank] = (rankDistribution[rank] || 0) + 1
+        })
+      })
+
+      return NextResponse.json({
+        totalRecords,
+        tableCount,
+        rankDistribution,
+        tables: tablesData.tables.map(table => ({
+          name: table.name,
+          recordCount: table.data.length
+        }))
+      })
+    }
+
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   } catch (error) {
     console.error('API Error:', error)
@@ -153,6 +188,76 @@ export async function POST(request, { params }) {
           { $set: { tables: tablesData.tables } }
         )
       }
+
+      return NextResponse.json({ success: true })
+    }
+
+    // Handle drag and drop moves
+    if (path === 'tables/move') {
+      const body = await request.json()
+      const { sourceTable, targetTable, rowData } = body
+      
+      const tablesData = await db.collection('tables').findOne({ type: 'main' })
+      if (!tablesData) {
+        return NextResponse.json({ error: 'No tables found' }, { status: 404 })
+      }
+
+      // Find source and target tables
+      const sourceTableIndex = tablesData.tables.findIndex(t => t.name === sourceTable)
+      const targetTableIndex = tablesData.tables.findIndex(t => t.name === targetTable)
+      
+      if (sourceTableIndex === -1 || targetTableIndex === -1) {
+        return NextResponse.json({ error: 'Source or target table not found' }, { status: 404 })
+      }
+
+      // Remove from source table
+      const sourceRowIndex = tablesData.tables[sourceTableIndex].data.findIndex(
+        row => row[0] === rowData[0] && row[1] === rowData[1]
+      )
+      
+      if (sourceRowIndex !== -1) {
+        tablesData.tables[sourceTableIndex].data.splice(sourceRowIndex, 1)
+      }
+
+      // Add to target table
+      tablesData.tables[targetTableIndex].data.push(rowData)
+
+      // Update database
+      await db.collection('tables').updateOne(
+        { type: 'main' },
+        { $set: { tables: tablesData.tables } }
+      )
+
+      return NextResponse.json({ success: true })
+    }
+
+    // Batch operations
+    if (path === 'tables/batch') {
+      const body = await request.json()
+      const { operation, tableName, rowIndices } = body
+      
+      const tablesData = await db.collection('tables').findOne({ type: 'main' })
+      if (!tablesData) {
+        return NextResponse.json({ error: 'No tables found' }, { status: 404 })
+      }
+
+      const tableIndex = tablesData.tables.findIndex(t => t.name === tableName)
+      if (tableIndex === -1) {
+        return NextResponse.json({ error: 'Table not found' }, { status: 404 })
+      }
+
+      if (operation === 'delete') {
+        // Sort indices in descending order to avoid index shifting issues
+        const sortedIndices = rowIndices.sort((a, b) => b - a)
+        sortedIndices.forEach(index => {
+          tablesData.tables[tableIndex].data.splice(index, 1)
+        })
+      }
+
+      await db.collection('tables').updateOne(
+        { type: 'main' },
+        { $set: { tables: tablesData.tables } }
+      )
 
       return NextResponse.json({ success: true })
     }
@@ -185,6 +290,22 @@ export async function PUT(request, { params }) {
             { $set: { tables: tablesData.tables } }
           )
         }
+      }
+
+      return NextResponse.json({ success: true })
+    }
+
+    // Update metadata
+    if (path === 'metadata') {
+      const body = await request.json()
+      
+      const tablesData = await db.collection('tables').findOne({ type: 'main' })
+      if (tablesData) {
+        tablesData.metadata = { ...tablesData.metadata, ...body }
+        await db.collection('tables').updateOne(
+          { type: 'main' },
+          { $set: { metadata: tablesData.metadata } }
+        )
       }
 
       return NextResponse.json({ success: true })
