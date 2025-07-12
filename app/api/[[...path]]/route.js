@@ -380,6 +380,12 @@ export async function PUT(request, { params }) {
     const path = url.pathname.split('/api/')[1] || ''
 
     if (path === 'tables') {
+      // Check authentication for updating tables
+      const user = await authenticate(request)
+      if (!user || user.role !== 'admin') {
+        return NextResponse.json({ error: 'تەنها بەڕێوەبەران دەتوانن خشتەکان دەستکاری بکەن' }, { status: 403 })
+      }
+
       const body = await request.json()
       const { tableName, data } = body
       
@@ -401,6 +407,11 @@ export async function PUT(request, { params }) {
 
     // Update metadata
     if (path === 'metadata') {
+      const user = await authenticate(request)
+      if (!user || user.role !== 'admin') {
+        return NextResponse.json({ error: 'تەنها بەڕێوەبەران دەتوانن مێتادەیتا دەستکاری بکەن' }, { status: 403 })
+      }
+
       const body = await request.json()
       
       const tablesData = await db.collection('tables').findOne({ type: 'main' })
