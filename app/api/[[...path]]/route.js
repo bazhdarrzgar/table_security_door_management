@@ -440,6 +440,12 @@ export async function DELETE(request, { params }) {
     const path = url.pathname.split('/api/')[1] || ''
 
     if (path === 'tables') {
+      // Check authentication for deleting tables
+      const user = await authenticate(request)
+      if (!user || user.role !== 'admin') {
+        return NextResponse.json({ error: 'تەنها بەڕێوەبەران دەتوانن خشتەکان بسڕنەوە' }, { status: 403 })
+      }
+
       const body = await request.json()
       const { tableName } = body
       
@@ -451,6 +457,20 @@ export async function DELETE(request, { params }) {
           { type: 'main' },
           { $set: { tables: tablesData.tables } }
         )
+      }
+
+      return NextResponse.json({ success: true })
+    }
+
+    // Logout endpoint
+    if (path === 'auth/logout') {
+      const user = await authenticate(request)
+      if (user) {
+        const authHeader = request.headers.get('authorization')
+        const token = authHeader.substring(7)
+        
+        // Remove session from database
+        await db.collection('sessions').deleteOne({ token })
       }
 
       return NextResponse.json({ success: true })
