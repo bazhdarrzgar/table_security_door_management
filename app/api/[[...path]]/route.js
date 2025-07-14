@@ -330,7 +330,43 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: true })
     }
 
-    // Batch operations
+    // Import endpoint
+    if (path === 'tables/import') {
+      const user = await authenticate(request)
+      if (!user || user.role !== 'admin') {
+        return NextResponse.json({ error: 'تەنها بەڕێوەبەران دەتوانن داتا ئینپۆرت بکەن' }, { status: 403 })
+      }
+
+      const body = await request.json()
+      const { tableName, data, mode } = body
+      
+      const tablesData = await db.collection('tables').findOne({ type: 'main' })
+      if (!tablesData) {
+        return NextResponse.json({ error: 'No tables found' }, { status: 404 })
+      }
+
+      const tableIndex = tablesData.tables.findIndex(t => t.name === tableName)
+      if (tableIndex === -1) {
+        return NextResponse.json({ error: 'Table not found' }, { status: 404 })
+      }
+
+      // Apply import based on mode
+      if (mode === 'replace') {
+        tablesData.tables[tableIndex].data = data
+      } else { // append mode
+        tablesData.tables[tableIndex].data = [...tablesData.tables[tableIndex].data, ...data]
+      }
+
+      await db.collection('tables').updateOne(
+        { type: 'main' },
+        { $set: { tables: tablesData.tables } }
+      )
+
+      return NextResponse.json({ 
+        success: true, 
+        message: `${data.length} تۆمار بە سەرکەوتوویی ئینپۆرت کرا` 
+      })
+    }
     if (path === 'tables/batch') {
       const user = await authenticate(request)
       if (!user || user.role !== 'admin') {
