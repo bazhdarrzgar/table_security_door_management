@@ -10,6 +10,8 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import AuthForm from '@/components/AuthForm'
 import UserInfo from '@/components/UserInfo'
+import ImportDialog from '@/components/ImportDialog'
+import AdvancedFilters from '@/components/AdvancedFilters'
 import { 
   DndContext, 
   DragOverlay, 
