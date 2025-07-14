@@ -274,6 +274,8 @@ export default function TableManager() {
   const [draggedRow, setDraggedRow] = useState(null)
   const [user, setUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
+  const [filters, setFilters] = useState([])
+  const [sort, setSort] = useState(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
