@@ -440,8 +440,15 @@ export default function TableManager() {
     }
   }
 
+  // Debug filtering state
+  useEffect(() => {
+    console.log('Filters updated:', filters)
+    console.log('Sort updated:', sort)
+  }, [filters, sort])
+
   // Helper function to extract numeric value from Kurdish ranks
   const extractNumericRank = (rank) => {
+    if (!rank) return 0
     const match = rank.match(/(\d+)/)
     return match ? parseInt(match[1]) : 0
   }
@@ -452,26 +459,26 @@ export default function TableManager() {
       let tableData = [...table.data]
       
       // Apply search filter
-      if (searchTerm) {
+      if (searchTerm && searchTerm.trim()) {
         tableData = tableData.filter(row => 
-          row[0].toLowerCase().includes(searchTerm.toLowerCase()) ||
-          row[1].toLowerCase().includes(searchTerm.toLowerCase())
+          (row[0] && row[0].toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (row[1] && row[1].toLowerCase().includes(searchTerm.toLowerCase()))
         )
       }
       
       // Apply advanced filters
       filters.forEach(filter => {
-        if (!filter.value.trim() && filter.condition !== 'isEmpty' && filter.condition !== 'isNotEmpty') return
+        if (!filter || (!filter.value?.trim() && filter.condition !== 'isEmpty' && filter.condition !== 'isNotEmpty')) return
         
         tableData = tableData.filter(row => {
           let fieldValue = ''
-          if (filter.field === 'name') fieldValue = row[0]
-          if (filter.field === 'rank') fieldValue = row[1]
-          if (filter.field === 'table') fieldValue = table.name
+          if (filter.field === 'name') fieldValue = row[0] || ''
+          if (filter.field === 'rank') fieldValue = row[1] || ''
+          if (filter.field === 'table') fieldValue = table.name || ''
           
           const originalFieldValue = fieldValue
           fieldValue = fieldValue.toLowerCase()
-          const filterValue = filter.value.toLowerCase()
+          const filterValue = (filter.value || '').toLowerCase()
           
           switch (filter.condition) {
             case 'contains':
@@ -496,12 +503,12 @@ export default function TableManager() {
     })
 
     // Apply sorting
-    if (sort) {
+    if (sort && sort.field) {
       if (sort.field === 'table') {
         // Sort tables by table name
         processedTables.sort((a, b) => {
-          const aValue = a.name.toLowerCase()
-          const bValue = b.name.toLowerCase()
+          const aValue = (a.name || '').toLowerCase()
+          const bValue = (b.name || '').toLowerCase()
           
           if (sort.direction === 'desc') {
             return bValue.localeCompare(aValue)
@@ -516,8 +523,8 @@ export default function TableManager() {
             let aValue, bValue
             
             if (sort.field === 'name') {
-              aValue = a[0].toLowerCase()
-              bValue = b[0].toLowerCase()
+              aValue = (a[0] || '').toLowerCase()
+              bValue = (b[0] || '').toLowerCase()
               
               if (sort.direction === 'desc') {
                 return bValue.localeCompare(aValue)
@@ -536,8 +543,8 @@ export default function TableManager() {
               }
               
               // If numeric values are same, sort by string
-              aValue = a[1].toLowerCase()
-              bValue = b[1].toLowerCase()
+              aValue = (a[1] || '').toLowerCase()
+              bValue = (b[1] || '').toLowerCase()
               
               if (sort.direction === 'desc') {
                 return bValue.localeCompare(aValue)
