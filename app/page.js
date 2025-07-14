@@ -440,78 +440,121 @@ export default function TableManager() {
     }
   }
 
-  const filteredTables = tables.map(table => {
-    let tableData = [...table.data]
-    
-    // Apply search filter
-    if (searchTerm) {
-      tableData = tableData.filter(row => 
-        row[0].toLowerCase().includes(searchTerm.toLowerCase()) ||
-        row[1].toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    }
-    
-    // Apply advanced filters
-    filters.forEach(filter => {
-      if (!filter.value.trim() && filter.condition !== 'isEmpty' && filter.condition !== 'isNotEmpty') return
+  // Helper function to extract numeric value from Kurdish ranks
+  const extractNumericRank = (rank) => {
+    const match = rank.match(/(\d+)/)
+    return match ? parseInt(match[1]) : 0
+  }
+
+  // Apply filters and sorting
+  const getFilteredAndSortedTables = () => {
+    let processedTables = tables.map(table => {
+      let tableData = [...table.data]
       
-      tableData = tableData.filter(row => {
-        let fieldValue = ''
-        if (filter.field === 'name') fieldValue = row[0]
-        if (filter.field === 'rank') fieldValue = row[1]
-        if (filter.field === 'table') fieldValue = table.name
+      // Apply search filter
+      if (searchTerm) {
+        tableData = tableData.filter(row => 
+          row[0].toLowerCase().includes(searchTerm.toLowerCase()) ||
+          row[1].toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      }
+      
+      // Apply advanced filters
+      filters.forEach(filter => {
+        if (!filter.value.trim() && filter.condition !== 'isEmpty' && filter.condition !== 'isNotEmpty') return
         
-        fieldValue = fieldValue.toLowerCase()
-        const filterValue = filter.value.toLowerCase()
-        
-        switch (filter.condition) {
-          case 'contains':
-            return fieldValue.includes(filterValue)
-          case 'equals':
-            return fieldValue === filterValue
-          case 'startsWith':
-            return fieldValue.startsWith(filterValue)
-          case 'endsWith':
-            return fieldValue.endsWith(filterValue)
-          case 'isEmpty':
-            return !fieldValue.trim()
-          case 'isNotEmpty':
-            return fieldValue.trim() !== ''
-          default:
-            return true
-        }
+        tableData = tableData.filter(row => {
+          let fieldValue = ''
+          if (filter.field === 'name') fieldValue = row[0]
+          if (filter.field === 'rank') fieldValue = row[1]
+          if (filter.field === 'table') fieldValue = table.name
+          
+          const originalFieldValue = fieldValue
+          fieldValue = fieldValue.toLowerCase()
+          const filterValue = filter.value.toLowerCase()
+          
+          switch (filter.condition) {
+            case 'contains':
+              return fieldValue.includes(filterValue)
+            case 'equals':
+              return fieldValue === filterValue
+            case 'startsWith':
+              return fieldValue.startsWith(filterValue)
+            case 'endsWith':
+              return fieldValue.endsWith(filterValue)
+            case 'isEmpty':
+              return !originalFieldValue.trim()
+            case 'isNotEmpty':
+              return originalFieldValue.trim() !== ''
+            default:
+              return true
+          }
+        })
       })
+      
+      return { ...table, data: tableData }
     })
-    
+
     // Apply sorting
     if (sort) {
-      tableData.sort((a, b) => {
-        let aValue = ''
-        let bValue = ''
-        
-        if (sort.field === 'name') {
-          aValue = a[0]
-          bValue = b[0]
-        } else if (sort.field === 'rank') {
-          aValue = a[1]
-          bValue = b[1]
-        } else if (sort.field === 'table') {
-          aValue = table.name
-          bValue = table.name
-        }
-        
-        aValue = aValue.toLowerCase()
-        bValue = bValue.toLowerCase()
-        
-        if (sort.direction === 'desc') {
-          return bValue.localeCompare(aValue)
-        }
-        return aValue.localeCompare(bValue)
-      })
+      if (sort.field === 'table') {
+        // Sort tables by table name
+        processedTables.sort((a, b) => {
+          const aValue = a.name.toLowerCase()
+          const bValue = b.name.toLowerCase()
+          
+          if (sort.direction === 'desc') {
+            return bValue.localeCompare(aValue)
+          }
+          return aValue.localeCompare(bValue)
+        })
+      } else {
+        // Sort data within each table
+        processedTables = processedTables.map(table => ({
+          ...table,
+          data: [...table.data].sort((a, b) => {
+            let aValue, bValue
+            
+            if (sort.field === 'name') {
+              aValue = a[0].toLowerCase()
+              bValue = b[0].toLowerCase()
+              
+              if (sort.direction === 'desc') {
+                return bValue.localeCompare(aValue)
+              }
+              return aValue.localeCompare(bValue)
+            } else if (sort.field === 'rank') {
+              // Handle numeric sorting for ranks
+              const aNumeric = extractNumericRank(a[1])
+              const bNumeric = extractNumericRank(b[1])
+              
+              if (aNumeric !== bNumeric) {
+                if (sort.direction === 'desc') {
+                  return bNumeric - aNumeric
+                }
+                return aNumeric - bNumeric
+              }
+              
+              // If numeric values are same, sort by string
+              aValue = a[1].toLowerCase()
+              bValue = b[1].toLowerCase()
+              
+              if (sort.direction === 'desc') {
+                return bValue.localeCompare(aValue)
+              }
+              return aValue.localeCompare(bValue)
+            }
+            
+            return 0
+          })
+        }))
+      }
     }
-    
-    return { ...table, data: tableData }
-  })
+
+    return processedTables
+  }
+
+  const filteredTables = getFilteredAndSortedTables()
 
   const handlePrint = () => {
     window.print()
