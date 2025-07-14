@@ -63,7 +63,12 @@ export default function AdvancedFilters({
   }
 
   const applyFilters = () => {
-    onFiltersChange(filters)
+    const validFilters = filters.filter(f => 
+      (f.value && f.value.trim()) || 
+      f.condition === 'isEmpty' || 
+      f.condition === 'isNotEmpty'
+    )
+    onFiltersChange(validFilters)
     if (sort) {
       onSortChange(sort)
     }
@@ -80,6 +85,7 @@ export default function AdvancedFilters({
   const setSortOrder = (field, direction) => {
     const newSort = { field, direction }
     setSort(newSort)
+    onSortChange(newSort)  // Apply immediately
   }
 
   const activeFiltersCount = filters.filter(f => f.value.trim()).length
