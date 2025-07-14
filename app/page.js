@@ -597,6 +597,23 @@ export default function TableManager() {
                   className="w-64"
                 />
               </div>
+              
+              <AdvancedFilters
+                tables={tables}
+                onFiltersChange={setFilters}
+                onSortChange={setSort}
+                currentFilters={filters}
+                currentSort={sort}
+              />
+              
+              {isAdmin && (
+                <ImportDialog
+                  tables={tables}
+                  onImportComplete={fetchTables}
+                  userRole={user.role}
+                />
+              )}
+              
               <Button onClick={handlePrint} variant="outline" className="flex items-center gap-2">
                 <Printer className="w-4 h-4" />
                 چاپ
@@ -607,7 +624,7 @@ export default function TableManager() {
               </Button>
               <Badge variant="secondary" className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-800">
                 <Users className="w-4 h-4" />
-                کۆی تۆمارەکان: {tables.reduce((sum, table) => sum + table.data.length, 0)}
+                کۆی تۆمارەکان: {filteredTables.reduce((sum, table) => sum + table.data.length, 0)}
               </Badge>
             </div>
 
